@@ -1,0 +1,35 @@
+import os
+import networkx as nx
+from realmap import RoadNetworkSelector
+import config
+
+def run_interactive_map():
+    print("初始化地图选择器...")
+    selector = RoadNetworkSelector(
+        location=config.LOCATION_CENTER,
+        dist=config.DISTANCE,
+        location_name=config.LOCATION_NAME
+    )
+    return selector
+
+def save_selected_network(selector):
+    # 获取选择完成后的图
+    G_selected = selector.selected_G
+    gathering_points = selector.gathering_points
+    capacities = selector.gathering_point_capacities
+    arterial_edges = selector.arterial_edges
+    os.makedirs(config.DATA_SAVE_PATH, exist_ok=True)
+    path = f"{config.DATA_SAVE_PATH}/selected_network.graphml"
+    nx.write_graphml(G_selected, path)
+
+    print(f"✅ 选定的路网已保存至：{path}")
+    print(f"集合点数量：{len(gathering_points)}，主干道路段：{len(arterial_edges)}")
+    return path
+
+if __name__ == "__main__":
+    selector = run_interactive_map()
+    save_selected_network(selector)
+
+    # 后续步骤（你后面补上）：
+    # from ga_selection import run_genetic_algorithm
+    # from bus_routing_s
