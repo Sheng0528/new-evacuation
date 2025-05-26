@@ -1,0 +1,19 @@
+LOCATION_CENTER = (43.061936, 141.354292)
+DISTANCE = 1500
+LOCATION_NAME = "Hokkaido Sapporo"
+
+# 遗传算法参数（第2章）
+GA_POP_SIZE = 100
+GA_MAX_GEN = 1000
+GA_CROSSOVER_RATE = 0.9
+GA_MUTATION_RATE = 0.1
+
+# 公交参数（第3章）
+BUS_CAPACITY = 40
+EVACUATION_TIME_LIMIT = 60  # 可选
+
+# 数据保存路径
+DATA_SAVE_PATH = "data/"
+
+# 可视化参数（可选）
+DRAW_MAP = True
