@@ -1,0 +1,69 @@
+import networkx as nx
+from shapely.geometry import Point
+
+def get_nearest_nodes(G, centroids):
+    """
+    将每个形心Point映射到路网G最近的节点编号
+    参数:
+        G: networkx.MultiDiGraph
+        centroids: list of shapely.geometry.Point
+    返回:
+        nearest_nodes: list of node ids，顺序与centroids一致
+    """
+    node_xy = {n: (d['x'], d['y']) for n, d in G.nodes(data=True)}
+    node_ids, xs, ys = zip(*[(n, xy[0], xy[1]) for n, xy in node_xy.items()])
+    nearest_nodes = []
+    for pt in centroids:
+        dists = [(n, ((pt.x - x) ** 2 + (pt.y - y) ** 2)) for n, x, y in zip(node_ids, xs, ys)]
+        n_min = min(dists, key=lambda x: x[1])[0]
+        nearest_nodes.append(n_min)
+    return nearest_nodes
+
+def dijkstra_all_pairs(selected_G, region_centroids, gathering_points, arterial_edges):
+    """
+    计算每个需求点（小区形心最近节点）到每个集合点的最短距离和穿越干路次数
+
+    参数:
+        selected_G: networkx.MultiDiGraph
+        region_centroids: list of shapely.geometry.Point (形心坐标)
+        gathering_points: list/set of node ids (集合点编号)
+        arterial_edges: set of (u, v, k) (主干路集合)
+    返回:
+        result: dict[node][gathering] = {'distance', 'arterial_crossings', 'path'}
+    """
+    region_centroid_nodes = get_nearest_nodes(selected_G, region_centroids)
+    result = {}
+    for demand_node in region_centroid_nodes:
+        result[demand_node] = {}
+        for gather in gathering_points:
+            try:
+                path = nx.shortest_path(selected_G, demand_node, gather, weight='length')
+                distance = nx.shortest_path_length(selected_G, demand_node, gather, weight='length')
+            except nx.NetworkXNoPath:
+                result[demand_node][gather] = {'distance': float('inf'), 'arterial_crossings': float('inf'), 'path': []}
+                continue
+
+            crossings = 0
+            for i in range(len(path) - 1):
+                u, v = path[i], path[i + 1]
+                found = False
+                if selected_G.has_edge(u, v):
+                    keys = selected_G[u][v].keys() if hasattr(selected_G[u][v], 'keys') else [0]
+                    for k in keys:
+                        if (u, v, k) in arterial_edges or (v, u, k) in arterial_edges:
+                            crossings += 1
+                            found = True
+                            break
+                if not found and selected_G.has_edge(v, u):
+                    keys = selected_G[v][u].keys() if hasattr(selected_G[v][u], 'keys') else [0]
+                    for k in keys:
+                        if (v, u, k) in arterial_edges or (u, v, k) in arterial_edges:
+                            crossings += 1
+                            break
+
+            result[demand_node][gather] = {
+                'distance': distance,
+                'arterial_crossings': crossings,
+                'path': path
+            }
+    return result
