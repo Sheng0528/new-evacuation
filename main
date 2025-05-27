@@ -1,35 +1,43 @@
-import os
-import networkx as nx
 from realmap import RoadNetworkSelector
-import config
+from Dijkstra import dijkstra_all_pairs
+from shapely.geometry import Point
+import geopandas as gpd
 
-def run_interactive_map():
-    print("初始化地图选择器...")
-    selector = RoadNetworkSelector(
-        location=config.LOCATION_CENTER,
-        dist=config.DISTANCE,
-        location_name=config.LOCATION_NAME
-    )
-    return selector
-
-def save_selected_network(selector):
-    # 获取选择完成后的图
-    G_selected = selector.selected_G
-    gathering_points = selector.gathering_points
-    capacities = selector.gathering_point_capacities
-    arterial_edges = selector.arterial_edges
-    os.makedirs(config.DATA_SAVE_PATH, exist_ok=True)
-    path = f"{config.DATA_SAVE_PATH}/selected_network.graphml"
-    nx.write_graphml(G_selected, path)
-
-    print(f"✅ 选定的路网已保存至：{path}")
-    print(f"集合点数量：{len(gathering_points)}，主干道路段：{len(arterial_edges)}")
-    return path
 
 if __name__ == "__main__":
-    selector = run_interactive_map()
-    save_selected_network(selector)
+    # 1. 打开路网选择器GUI，进行节点、道路、主干路、集合点等选择
+    selector = RoadNetworkSelector(
+        location=(43.061936, 141.354292),
+        dist=1500,
+        location_name="Hokkaido Sapporo"
+    )
+    # 你需要在弹出的窗口中完成所有选择，然后点击“Complete”
 
-    # 后续步骤（你后面补上）：
-    # from ga_selection import run_genetic_algorithm
-    # from bus_routing_s
+    # 2. 完成选择后，确保网络已生成
+    selector.finalize_selection(None)
+
+    # 3. 读取小区/需求区矢量数据并获取形心 假设你有一个小区多边形shapefile（路径为'areas.shp'），并且投影和路网一致
+    gdf = gpd.read_file('areas.shp')
+
+    # 如果路网和小区投影不同，你可以这样投影对齐（可选）：
+    # gdf = gdf.to_crs(selector.nodes.crs)
+
+    # 计算所有小区的形心
+    region_centroids = list(gdf.geometry.centroid)
+
+    # 4. 获取集合点、主干路集合
+    gathering_points = list(selector.gathering_points)
+    arterial_edges = selector.arterial_edges
+
+    # 5. 计算最短距离和穿越主干路次数
+    result = dijkstra_all_pairs(
+        selector.selected_G,
+        region_centroids,
+        gathering_points,
+        arterial_edges
+    )
+
+    # 6. 输出结果
+    for demand_node, d in result.items():
+        for gather_node, info in d.items():
+            print(f"{demand_node} -> {gather_node}: 距离={info['distance']} 穿越干路={info['arterial_crossings']} 路径={info['path']}")
